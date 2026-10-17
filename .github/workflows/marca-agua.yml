@@ -1,0 +1,57 @@
+name: Poner marca de agua
+
+on:
+  push:
+    branches: [main]
+    paths: ["entrada/*.xlsx"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: marca-agua
+  cancel-in-progress: false
+
+jobs:
+  procesar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar librerías
+        run: pip install -r requirements.txt
+
+      - name: Procesar Excels nuevos de la carpeta entrada/
+        run: |
+          set -e
+          OWNER=$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')
+          REPO="${GITHUB_REPOSITORY#*/}"
+          BASE="https://${OWNER}.github.io/${REPO}/fotos/"
+          git config user.name  "marca-agua-bot"
+          git config user.email "marca-agua-bot@users.noreply.github.com"
+          shopt -s nullglob
+          for f in entrada/*.xlsx; do
+            nombre=$(basename "$f" .xlsx)
+            echo "== Procesando $f"
+            python marca_agua.py "$f" --base-url "$BASE" --out-dir fotos \
+                   --out-excel "resultados/${nombre}_CON_LINKS.xlsx"
+            rm -f /tmp/lote_*
+            git ls-files --others --exclude-standard fotos > /tmp/nuevas.txt
+            split -l 800 /tmp/nuevas.txt /tmp/lote_ || true
+            for l in /tmp/lote_*; do
+              xargs -a "$l" git add
+              git commit -q -m "Fotos con marca de agua (${nombre})"
+              git push -q
+            done
+            mkdir -p entrada/procesados
+            git mv -f "$f" "entrada/procesados/${nombre}.xlsx"
+            git add -A resultados entrada
+            git commit -q -m "Excel con links: ${nombre}" || true
+            git push -q
+          done
