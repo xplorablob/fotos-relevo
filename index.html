@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Marca de Agua Relevo</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{--morado:#7F46F1;--menta:#00F1B2;--txt:#1d1b22;--sub:#6b6875;--borde:#e4e2ea;--fondo:#F8F8F9;--card:#fff;--rojo:#E53935;--verde:#43A047;--amar:#FBC02D}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Inter,system-ui,sans-serif;background:var(--fondo);color:var(--txt)}
+  header{background:linear-gradient(120deg,var(--menta),var(--morado));color:#fff;padding:28px 16px 64px}
+  .wrap{max-width:980px;margin:0 auto}
+  h1{margin:0;font-size:26px;font-weight:700}
+  header p{margin:6px 0 0;opacity:.92}
+  main{margin-top:-44px;padding:0 16px 40px}
+  .card{background:var(--card);border:1px solid var(--borde);border-radius:14px;padding:20px;margin-bottom:16px;box-shadow:0 2px 10px rgba(30,20,60,.05)}
+  h2{font-size:15px;margin:0 0 12px;color:#55525e;text-transform:uppercase;letter-spacing:.04em}
+  .pasos{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+  .paso{border:1px solid var(--borde);border-radius:12px;padding:14px}
+  .num{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:50%;background:var(--morado);color:#fff;font-weight:700;font-size:13px}
+  .paso b{display:block;margin:8px 0 4px}
+  .paso span{color:var(--sub);font-size:14px;line-height:1.45}
+  .btn{display:inline-block;background:var(--morado);color:#fff;text-decoration:none;font-weight:600;padding:11px 18px;border-radius:10px;border:0;cursor:pointer;font-size:14px}
+  .btn.sec{background:#fff;color:var(--morado);border:1.5px solid var(--morado)}
+  .fila{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th{text-align:left;color:#55525e;font-weight:600;border-bottom:1px solid var(--borde);padding:8px 6px}
+  td{border-bottom:1px solid var(--borde);padding:9px 6px;word-break:break-all}
+  .chip{display:inline-block;padding:3px 10px;border-radius:99px;font-size:12px;font-weight:600}
+  .ok{background:#e6f5e7;color:var(--verde)}.run{background:#fff6dc;color:#9a7300}.err{background:#fdeaea;color:var(--rojo)}
+  input[type=text]{flex:1;min-width:220px;padding:10px 12px;border:1px solid var(--borde);border-radius:10px;font:inherit}
+  #prev{margin-top:12px;max-width:100%;border-radius:10px;display:none;border:1px solid var(--borde)}
+  .muted{color:var(--sub);font-size:14px}
+  a{color:var(--morado)}
+</style>
+</head>
+<body>
+<header><div class="wrap">
+  <h1>Marca de Agua · Fotos de Relevo</h1>
+  <p>Sube el Excel con la columna FOTO y recibe el mismo Excel con el link público de cada foto con su marca de agua.</p>
+</div></header>
+<main class="wrap">
+  <section class="card">
+    <h2>Cómo funciona</h2>
+    <div class="pasos">
+      <div class="paso"><span class="num">1</span><b>Sube tu Excel</b><span>Columnas: FOTO, FECHA, HORA, RAZON SOCIAL, DISTANCIA (y DNI cuando la tengas).</span></div>
+      <div class="paso"><span class="num">2</span><b>Se procesa solo</b><span>Cada foto recibe la franja gris con letras blancas. Unas 3,000 fotos tardan ~20-30 min.</span></div>
+      <div class="paso"><span class="num">3</span><b>Descarga el resultado</b><span>Aparece abajo con la columna FOTO_MARCA_AGUA y el estado de cada fila.</span></div>
+    </div>
+    <div class="fila" style="margin-top:16px">
+      <a class="btn" id="subir" target="_blank" rel="noopener">Subir Excel</a>
+      <a class="btn sec" id="progreso" target="_blank" rel="noopener">Ver progreso</a>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Estado del último proceso</h2>
+    <div id="estado" class="muted">Cargando…</div>
+  </section>
+
+  <section class="card">
+    <h2>Excels con links</h2>
+    <div id="lista" class="muted">Cargando…</div>
+  </section>
+
+  <section class="card">
+    <h2>Probar un link</h2>
+    <div class="fila">
+      <input type="text" id="link" placeholder="Pega aquí un link de FOTO_MARCA_AGUA">
+      <button class="btn sec" id="ver">Ver foto</button>
+    </div>
+    <img id="prev" alt="Vista previa de la foto con marca de agua">
+    <p id="msg" class="muted"></p>
+  </section>
+</main>
+<script>
+  const owner = location.hostname.split('.')[0];
+  const repo = location.pathname.split('/').filter(Boolean)[0] || 'fotos-relevo';
+  const gh = `https://github.com/${owner}/${repo}`;
+  const api = `https://api.github.com/repos/${owner}/${repo}`;
+  document.getElementById('subir').href = `${gh}/upload/main/entrada`;
+  document.getElementById('progreso').href = `${gh}/actions`;
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+  fetch(`${api}/contents/resultados?ref=main`).then(r => r.ok ? r.json() : []).then(items => {
+    const xs = (Array.isArray(items) ? items : []).filter(i => i.name.endsWith('.xlsx'));
+    const el = document.getElementById('lista');
+    if (!xs.length) { el.textContent = 'Aún no hay resultados.'; return; }
+    el.innerHTML = '<table><tr><th>Archivo</th><th></th></tr>' + xs.reverse().map(i =>
+      `<tr><td>${esc(i.name)}</td><td style="text-align:right"><a class="btn sec" href="${esc(i.download_url)}" download>Descargar</a></td></tr>`).join('') + '</table>';
+  }).catch(() => document.getElementById('lista').textContent = 'No se pudo cargar la lista.');
+
+  fetch(`${api}/actions/runs?per_page=1`).then(r => r.json()).then(d => {
+    const run = d.workflow_runs && d.workflow_runs[0];
+    const el = document.getElementById('estado');
+    if (!run) { el.textContent = 'Todavía no se ha procesado ningún Excel.'; return; }
+    const f = new Date(run.created_at).toLocaleString('es-PE');
+    let chip = '<span class="chip run">En proceso</span>';
+    if (run.status === 'completed') chip = run.conclusion === 'success' ? '<span class="chip ok">Terminado</span>' : '<span class="chip err">Con error</span>';
+    el.innerHTML = `${chip} &nbsp;Iniciado: ${esc(f)} · <a href="${esc(run.html_url)}" target="_blank" rel="noopener">ver detalle</a>`;
+  }).catch(() => document.getElementById('estado').textContent = 'No se pudo consultar el estado.');
+
+  document.getElementById('ver').onclick = () => {
+    const u = document.getElementById('link').value.trim(), img = document.getElementById('prev'), m = document.getElementById('msg');
+    if (!u) return;
+    m.textContent = 'Cargando…'; img.style.display = 'none';
+    img.onload = () => { img.style.display = 'block'; m.textContent = 'El link funciona.'; };
+    img.onerror = () => { m.textContent = 'Ese link todavía no existe. Si el proceso sigue corriendo, espera a que termine.'; };
+    img.src = u;
+  };
+</script>
+</body>
+</html>
